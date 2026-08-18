@@ -55,6 +55,33 @@ class Layout {
 	}
 }
 
+class SmartFile {
+	constructor(filePath){
+		const _FM = FileManager.local();
+		this.fm = _FM.isFileStoredIniCloud(module.filename) ? FileManager.iCloud() : _FM;
+		this.libraryPath = this.fm.joinPath(this.fm.libraryDirectory(), filePath);
+		this.extension = filePath.slice(filePath.lastIndexOf(".") + 1).toLowerCase();
+	}
+	create(content){
+		if (!this.fm.fileExists(this.libraryPath)) {
+			this.fm.writeString(this.libraryPath, this.extension === "json"
+				? JSON.stringify(content, null, "\t") : String(content)
+			);
+		}
+	}
+	get content(){
+		if (!this.fm.fileExists(this.libraryPath)) return undefined;
+		const Content = this.fm.readString(this.libraryPath);
+		return this.extension === "json"
+			? JSON.parse(Content) : Content;
+	}
+	set content(newValue){
+		this.fm.writeString(this.libraryPath, this.extension === "json"
+			? JSON.stringify(newValue, null, "\t") : String(newValue)
+		);
+	}
+}
+
 async function presentAlert(Style) {
 	const Art = new Alert();
 	Art.title = Style.title;
@@ -88,34 +115,47 @@ async function presentAlert(Style) {
 	return {index: ActionIndex, text: TextList};
 }
 
-function sum(list) {
-	let total = 0;
-	for (let i=0; i<list.length; i++) {
-		total += list[i].type * list[i].amount * (REQUIRED[i].unit == "pieces" ? 1 : 50);
-	}
-	return total;
-}
-
 function addComma(value) {
 	return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function sum(list) {
+	let total = 0;
+	for (let i=0; i<list.length; i++) {
+		total += REQUIRED[i].unit === "pieces"
+			? list[i].piece * list[i].type
+			: list[i].piece * list[i].type + list[i].stick * list[i].type * 50;
+	}
+	return total;
+}
+
+function getRequired(i) {
+	return REQUIRED[i].required * REQUIRED[i].type * (REQUIRED[i].unit === "pieces" ? 1 : 50);
+}
+
+function getSubtotal(i, amount) {
+	return REQUIRED[i].unit === "pieces"
+		? amount[0] * REQUIRED[i].type
+		: amount[1] * REQUIRED[i].type + amount[0] * REQUIRED[i].type * 50; // order is stick, piece
+}
+
 function checkCondition(i, mode, amount) {
 	if (mode !== "deficit") return true;
-	if (amount <= REQUIRED[i].required) return true;
+	if (getSubtotal(i, amount) <= getRequired(i)) return true;
 	return false;
 }
 
 class Table {
-	constructor() {
+	constructor(file) {
 		this.table = new UITable();
 		this.table.showSeparators = true;
 		this.table.present(false);
-		this.difference = [{ "type": 5000, "amount": 0 }, { "type": 1000, "amount": 0 }, { "type": 500, "amount": 0 }, { "type": 100, "amount": 0 }, { "type": 50, "amount": 0 }, { "type": 10, "amount": 0 }, { "type": 5, "amount": 0 }, { "type": 1, "amount": 0 }];
 		this.mode = 0;
+		this.file = file;
+		this.content = file.content;
 	}
 
-	refresh() {
+	refresh(file) {
 		this.table.removeAllRows();
 		const darkFont_Active = Color.dynamic(new Color("#7F7F7F"), new Color("#8E8E8E"));
 		const darkFont_Inactive = Color.dynamic(new Color("#DDDDDD"), new Color("#303030"));
@@ -125,7 +165,7 @@ class Table {
 			{ title: "deficit", button: "💸不足■/💰残高□" },
 			{ title: "balance", button: "💸不足□/💰残高■" }];
 		new Layout(this.table, {
-			body: { height: 100, background: backColor },
+			body: { height: 80, background: backColor },
 			txt1: {
 				text: ["💰Exchange Calculator", ""],
 				font: [new Font("Arial-BoldMT", 30), new Font("Arial-BoldMT", 16)]
@@ -140,10 +180,10 @@ class Table {
 			img2: {
 				image: SFSymbol.named("sum").image,
 				align: "center",
-				widthWeight: 10,
+				widthWeight: 12,
 			},
 			txt3: {
-				text: [`¥ ${addComma(sum(this.difference))}`, ""],
+				text: [`¥ ${addComma(sum(this.content))}`, ""],
 				font: [new Font("Arial-BoldMT", 30), new Font("Arial-BoldMT", 16)],
 				color: [green, green],
 				align: "right",
@@ -180,78 +220,128 @@ class Table {
 			}
 		};
 		titleAndMode.ApplyStyles();
-		for (let i = 0; i < this.difference.length; i++) {
-			const unit = REQUIRED[i].unit == "pieces" ? "枚" : "本";
-			const subtotal = this.difference[i].amount * this.difference[i].type * (REQUIRED[i].unit == "pieces" ? 1 : 50);
+		for (let i=0; i<this.content.length; i++) {
+			let subtotal, showCount, unit;
+			if (REQUIRED[i].unit === "pieces") {
+				subtotal = this.content[i].piece * REQUIRED[i].type;
+				showCount = `${addComma(this.content[i].piece)}枚`;
+				unit = "枚";
+			} else {
+				subtotal = this.content[i].piece * REQUIRED[i].type + this.content[i].stick * REQUIRED[i].type * 50; // can't use getSubtotal() since order doesn't match
+				showCount = `${addComma(this.content[i].stick)}本 + ${addComma(this.content[i].piece)}枚`;
+				unit = "本";
+			}
 			const row = new Layout(this.table);
-			row.style = {
-				"body": {
-					height: 60,
-					onSelect: {
-						select: true,
-						dismiss: false,
-						id: "selectRow"
+				row.style = {
+					"body": {
+						height: 60,
+						onSelect: {
+							select: true,
+							dismiss: false,
+							id: "selectRow"
+						}
+					},
+					txt1: {
+						text: [" ", "¥"],
+						font: [new Font("Arial-BoldMT", 5), new Font("Arial-BoldMT", 16)],
+						align: "right",
+						widthWeight: 5
+					},
+					txt2: {
+						text: [`${addComma(this.content[i].type)}`, ""],
+						font: [new Font("Arial-BoldMT", 22), new Font("Arial-BoldMT", 22)],
+						align: "right",
+						widthWeight: 17,
+					},
+					txt3: {
+						text: [`${addComma(REQUIRED[i].required)}${unit}`, ""],
+						font: [new Font("Arial-MT", 22), new Font("Arial-MT", 22)],
+						color: [this.mode == 0 ? darkFont_Active : darkFont_Inactive, this.mode == 0 ? darkFont_Active : darkFont_Inactive],
+						align: "right",
+						widthWeight: 28,
+					},
+					txt4: {
+						text: [" ".repeat(10) + showCount, " ".repeat(20) + `= ¥${addComma(subtotal)}`],
+						font: [new Font("Arial-MT", 23), new Font("Arial-MT", (this.content[i].piece || this.content[i].stick) ? 18 : 0)],
+						color: [null, green],
+						align: "left",
+						widthWeight: 54,
 					}
-				},
-				img1: {
-					image: SFSymbol.named("yensign").image,
-					widthWeight: 5,
-				},
-				txt2: {
-					text: [`${addComma(this.difference[i].type)}`, ""],
-					font: [new Font("Arial-BoldMT", 22), new Font("Arial-BoldMT", 22)],
-					align: "right",
-					widthWeight: 17,
-				},
-				txt3: {
-					text: [`${addComma(REQUIRED[i].required)}${unit}`, ""],
-					font: [new Font("Arial-MT", 22), new Font("Arial-MT", 22)],
-					color: [this.mode == 0 ? darkFont_Active : darkFont_Inactive, this.mode == 0 ? darkFont_Active : darkFont_Inactive],
-					align: "right",
-					widthWeight: 28,
-				},
-				txt4: {
-					text: [" ".repeat(10) + `${addComma(this.difference[i].amount)}${unit}`, " ".repeat(20) + `= ¥${addComma(subtotal)}`],
-					font: [new Font("Arial-MT", 23), new Font("Arial-MT", this.difference[i].amount ? 18 : 0)],
-					color: [null, green],
-					align: "left",
-					widthWeight: 54,
-				}
-			};
-			row.event = {
-				selectRow: async () => {
-					const input = await presentAlert({
-						type: "alert",
-						title: `Enter the ${modeTitle[this.mode].title} for ¥${this.difference[i].type}`,
-						message: `The necessary amount is ${REQUIRED[i].required}${unit}.`,
-						act1: "OK",
-						can2: "Cancel",
-						txt3: ["Enter...", String(this.difference[i].amount == 0 ? "" : this.difference[i].amount), "number"]
-					});
-					if (input.index === -1) return; // Canceled
-					if (!input.text[0]) return; // Empty input
-					if (!checkCondition(i, modeTitle[this.mode].title, input.text[0])) {
-						const doubleCheck = await presentAlert({
+				};
+				row.event = {
+					selectRow: async () => {
+						let alertStyle = {
 							type: "alert",
-							title: `It exceeds the necessary amount`,
-							message: `You entered ${input.text[0]}${unit}, but the necessary amount is ${REQUIRED[i].required}${unit}.`,
-							des1: "OK",
+							title: `Enter the ${modeTitle[this.mode].title} for ¥${this.content[i].type}`,
+							message: `The necessary ${REQUIRED[i].unit} is ${REQUIRED[i].required}${unit}.`,
+							act1: "OK",
 							can2: "Cancel"
-						});
-						if (doubleCheck.index === -1) return; // Canceled
+						};
+						if (REQUIRED[i].unit === "pieces") {
+							alertStyle.txt3 = ["枚数...", String(this.content[i].piece == 0 ? "" : this.content[i].piece), "number"];
+						} else {
+							alertStyle.txt3 = ["本数...", String(this.content[i].stick == 0 ? "" : this.content[i].stick), "number"];
+							alertStyle.txt4 = ["枚数...", String(this.content[i].piece == 0 ? "" : this.content[i].piece), "number"];
+						}
+						const input = await presentAlert(alertStyle);
+						if (input.index === -1) return; // Canceled
+						if (!input.text[0] && !input.text[1]) return; // Empty input
+						if (!checkCondition(i, modeTitle[this.mode].title, input.text)) {
+							const doubleCheck = await presentAlert({
+								type: "alert",
+								title: `It exceeds the necessary piece`,
+								message: `You entered ¥${addComma(getSubtotal(i, input.text))}, but the necessary is ¥${addComma(getRequired(i))}.`,
+								des1: "OK",
+								can2: "Cancel"
+							});
+							if (doubleCheck.index === -1) return; // Canceled
+						}
+						if (REQUIRED[i].unit === "pieces") {
+							this.content[i].piece = parseInt(input.text[0]);
+						} else {
+							this.content[i].stick = parseInt(input.text[0] ? input.text[0] : 0) + parseInt(input.text[1] / 50); // avoid being NaN
+							this.content[i].piece = parseInt(input.text[1] % 50);
+						}
+						this.file.content = this.content;
+						this.refresh();
 					}
-					this.difference[i].amount = parseInt(input.text[0]);
-					this.refresh();
-				}
-			};
+				};
 			row.ApplyStyles();
 		}
+		const resetBtnRow = new Layout(this.table);
+		resetBtnRow.style = {
+			body: { height: 100 },
+			btn1: {
+				title: " ".repeat(20) + "Reset Sheet",
+				align: "right",
+				widthWeight: 100,
+				id: "reset"
+			}
+		};
+		resetBtnRow.event = {
+			reset: async () => {
+				const confirm = await presentAlert({
+					type: "sheet",
+					title: "Reset",
+					message: "Are you sure you want to reset?",
+					des1: "Reset",
+					can2: "Cancel"
+				});
+				if (confirm.index === -1) return;
+				this.content = [{ "type": 5000, "piece": 0 }, { "type": 1000, "piece": 0 }, { "type": 500, "piece": 0, "stick": 0 }, { "type": 100, "piece": 0, "stick": 0 }, { "type": 50, "piece": 0, "stick": 0 }, { "type": 10, "piece": 0, "stick": 0 }, { "type": 5, "piece": 0, "stick": 0 }, { "type": 1, "piece": 0, "stick": 0 }];
+				this.file.content = this.content;
+				this.refresh();
+			}
+		};
+		resetBtnRow.ApplyStyles();
 		this.table.reload();
 	}
 }
 
 function main() {
-	const table = new Table();
+	const file = new SmartFile("ExchangeRecord.json");
+	file.create([{ "type": 5000, "piece": 0 }, { "type": 1000, "piece": 0 }, { "type": 500, "piece": 0, "stick": 0 }, { "type": 100, "piece": 0, "stick": 0 }, { "type": 50, "piece": 0, "stick": 0 }, { "type": 10, "piece": 0, "stick": 0 }, { "type": 5, "piece": 0, "stick": 0 }, { "type": 1, "piece": 0, "stick": 0 }]);
+	const table = new Table(file);
 	table.refresh();
 }
 
