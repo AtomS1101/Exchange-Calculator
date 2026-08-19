@@ -1,12 +1,25 @@
 const REQUIRED = [
-	{ "type": 5000, "required": 10, "unit": "pieces" },
-	{ "type": 1000, "required": 20, "unit": "pieces" },
-	{ "type": 500,  "required": 1,  "unit": "sticks" },
-	{ "type": 100,  "required": 2,  "unit": "sticks" },
-	{ "type": 50,   "required": 1,  "unit": "sticks" },
-	{ "type": 10,   "required": 2,  "unit": "sticks" },
-	{ "type": 5,    "required": 1,  "unit": "sticks" },
-	{ "type": 1,    "required": 1,  "unit": "sticks" }
+	{ "type": 10000, "required": 0,  "unit": "pieces" },
+	{ "type": 5000,  "required": 10, "unit": "pieces" },
+	{ "type": 1000,  "required": 20, "unit": "pieces" },
+	{ "type": 500,   "required": 1,  "unit": "sticks" },
+	{ "type": 100,   "required": 2,  "unit": "sticks" },
+	{ "type": 50,    "required": 1,  "unit": "sticks" },
+	{ "type": 10,    "required": 2,  "unit": "sticks" },
+	{ "type": 5,     "required": 1,  "unit": "sticks" },
+	{ "type": 1,     "required": 1,  "unit": "sticks" }
+];
+
+const jsonFormat = [
+	{ "type": 10000, "piece": 0 },
+	{ "type": 5000,  "piece": 0 },
+	{ "type": 1000,  "piece": 0 },
+	{ "type": 500,   "piece": 0, "stick": 0 },
+	{ "type": 100,   "piece": 0, "stick": 0 },
+	{ "type": 50,    "piece": 0, "stick": 0 },
+	{ "type": 10,    "piece": 0, "stick": 0 },
+	{ "type": 5,     "piece": 0, "stick": 0 },
+	{ "type": 1,     "piece": 0, "stick": 0 }
 ];
 
 class Layout {
@@ -251,14 +264,14 @@ class Table {
 						text: [`${addComma(this.content[i].type)}`, ""],
 						font: [new Font("Arial-BoldMT", 22), new Font("Arial-BoldMT", 22)],
 						align: "right",
-						widthWeight: 17,
+						widthWeight: 22,
 					},
 					txt3: {
 						text: [`${addComma(REQUIRED[i].required)}${unit}`, ""],
 						font: [new Font("Arial-MT", 22), new Font("Arial-MT", 22)],
 						color: [this.mode == 0 ? darkFont_Active : darkFont_Inactive, this.mode == 0 ? darkFont_Active : darkFont_Inactive],
 						align: "right",
-						widthWeight: 28,
+						widthWeight: 23,
 					},
 					txt4: {
 						text: [" ".repeat(10) + showCount, " ".repeat(20) + `= ¥${addComma(subtotal)}`],
@@ -328,7 +341,7 @@ class Table {
 					can2: "Cancel"
 				});
 				if (confirm.index === -1) return;
-				this.content = [{ "type": 5000, "piece": 0 }, { "type": 1000, "piece": 0 }, { "type": 500, "piece": 0, "stick": 0 }, { "type": 100, "piece": 0, "stick": 0 }, { "type": 50, "piece": 0, "stick": 0 }, { "type": 10, "piece": 0, "stick": 0 }, { "type": 5, "piece": 0, "stick": 0 }, { "type": 1, "piece": 0, "stick": 0 }];
+				this.content = jsonFormat;
 				this.file.content = this.content;
 				this.refresh();
 			}
@@ -340,7 +353,7 @@ class Table {
 
 function main() {
 	const file = new SmartFile("ExchangeRecord.json");
-	file.create([{ "type": 5000, "piece": 0 }, { "type": 1000, "piece": 0 }, { "type": 500, "piece": 0, "stick": 0 }, { "type": 100, "piece": 0, "stick": 0 }, { "type": 50, "piece": 0, "stick": 0 }, { "type": 10, "piece": 0, "stick": 0 }, { "type": 5, "piece": 0, "stick": 0 }, { "type": 1, "piece": 0, "stick": 0 }]);
+	file.create(jsonFormat);
 	const table = new Table(file);
 	table.refresh();
 }
