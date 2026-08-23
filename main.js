@@ -359,7 +359,7 @@ class Table {
 					can2: "Cancel"
 				});
 				if (confirm.index === -1) return;
-				this.content = jsonFormat;
+				this.content = JSON.parse(JSON.stringify(jsonFormat)); // deep clone
 				this.content.lastReset = Date.now();
 				this.file.content = this.content;
 				this.refresh();
