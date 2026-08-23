@@ -328,10 +328,10 @@ class Table {
 							if (doubleCheck.index === -1) return; // Canceled
 						}
 						if (REQUIRED[i].unit === "pieces") {
-							this.content.balance[i].piece = parseInt(input.text[0]);
+							this.content.balance[i].piece = parseInt(input.text[0], 10);
 						} else {
-							this.content.balance[i].stick = parseInt(input.text[0] ? input.text[0] : 0) + parseInt(input.text[1] / 50); // avoid being NaN
-							this.content.balance[i].piece = parseInt(input.text[1] % 50);
+							this.content.balance[i].stick = parseInt(input.text[0] ? input.text[0] : 0, 10) + parseInt(input.text[1] / 50, 10); // avoid being NaN
+							this.content.balance[i].piece = parseInt(input.text[1] % 50, 10);
 						}
 						this.file.content = this.content;
 						this.refresh();
