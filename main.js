@@ -10,17 +10,21 @@ const REQUIRED = [
 	{ "type": 1,     "required": 1,  "unit": "sticks" }
 ];
 
-const jsonFormat = [
-	{ "type": 10000, "piece": 0 },
-	{ "type": 5000,  "piece": 0 },
-	{ "type": 1000,  "piece": 0 },
-	{ "type": 500,   "piece": 0, "stick": 0 },
-	{ "type": 100,   "piece": 0, "stick": 0 },
-	{ "type": 50,    "piece": 0, "stick": 0 },
-	{ "type": 10,    "piece": 0, "stick": 0 },
-	{ "type": 5,     "piece": 0, "stick": 0 },
-	{ "type": 1,     "piece": 0, "stick": 0 }
-];
+const jsonFormat = {
+	mode: 0,
+	lastReset: 0,
+	balance: [
+		{ "type": 10000, "piece": 0 },
+		{ "type": 5000,  "piece": 0 },
+		{ "type": 1000,  "piece": 0 },
+		{ "type": 500,   "piece": 0, "stick": 0 },
+		{ "type": 100,   "piece": 0, "stick": 0 },
+		{ "type": 50,    "piece": 0, "stick": 0 },
+		{ "type": 10,    "piece": 0, "stick": 0 },
+		{ "type": 5,     "piece": 0, "stick": 0 },
+		{ "type": 1,     "piece": 0, "stick": 0 }
+	]
+};
 
 class Layout {
 	constructor(table, style = {}, event = {}) {
@@ -132,9 +136,13 @@ function addComma(value) {
 	return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-function sum(list) {
+function sum(list, mode) {
 	let total = 0;
-	for (let i=0; i<list.length; i++) {
+	for (let i = 0; i < list.length; i++) {
+		if (mode === "deficit" && list[i].type === 10000) {
+			total -= list[i].piece * list[i].type;
+			continue; // avoid adding
+		}
 		total += REQUIRED[i].unit === "pieces"
 			? list[i].piece * list[i].type
 			: list[i].piece * list[i].type + list[i].stick * list[i].type * 50;
@@ -154,6 +162,7 @@ function getSubtotal(i, amount) {
 
 function checkCondition(i, mode, amount) {
 	if (mode !== "deficit") return true;
+	if (REQUIRED[i].type === 10000) return true; // No limitation for 10000 yen
 	if (getSubtotal(i, amount) <= getRequired(i)) return true;
 	return false;
 }
@@ -163,7 +172,6 @@ class Table {
 		this.table = new UITable();
 		this.table.showSeparators = true;
 		this.table.present(false);
-		this.mode = 0;
 		this.file = file;
 		this.content = file.content;
 	}
@@ -173,10 +181,12 @@ class Table {
 		const darkFont_Active = Color.dynamic(new Color("#7F7F7F"), new Color("#8E8E8E"));
 		const darkFont_Inactive = Color.dynamic(new Color("#DDDDDD"), new Color("#303030"));
 		const green = Color.dynamic(new Color("#34C759"), new Color("#4AFF3D"));
+		const red = Color.dynamic(new Color("#FF383C"), new Color("#FF4245"));
 		const backColor = Color.dynamic(new Color("#CCCCCC"), new Color("#333333"));
 		let modeTitle = [
-			{ title: "deficit", button: "💸不足■/💰残高□" },
-			{ title: "balance", button: "💸不足□/💰残高■" }];
+			{ title: "balance", button: "💰残高■/💸不足□" },
+			{ title: "deficit", button: "💰残高□/💸不足■" }];
+		let modeName = modeTitle[this.content.mode].title;
 		new Layout(this.table, {
 			body: { height: 80, background: backColor },
 			txt1: {
@@ -184,6 +194,7 @@ class Table {
 				font: [new Font("Arial-BoldMT", 30), new Font("Arial-BoldMT", 16)]
 			}
 		}).ApplyStyles();
+		const total = sum(this.content.balance, modeName);
 		new Layout(this.table, {
 			body: { height: 80, background: backColor },
 			txt1: {
@@ -196,11 +207,17 @@ class Table {
 				widthWeight: 12,
 			},
 			txt3: {
-				text: [`¥ ${addComma(sum(this.content))}`, ""],
+				text: ["出金", ""],
+				font: [new Font("Arial-BoldMT", modeName === "deficit" ? 20 : 0), new Font("Arial-BoldMT", 16)],
+				align: "center",
+				widthWeight: 20
+			},
+			txt4: {
+				text: [`¥ ${addComma(total)}`, ""],
 				font: [new Font("Arial-BoldMT", 30), new Font("Arial-BoldMT", 16)],
-				color: [green, green],
+				color: [total < 0 ? red : green, total < 0 ? red : green],
 				align: "right",
-				widthWeight: 80
+				widthWeight: 58
 			}
 		}).ApplyStyles();
 		const titleAndMode = new Layout(this.table);
@@ -219,29 +236,30 @@ class Table {
 				widthWeight: 28,
 			},
 			btn3: {
-				title: modeTitle[this.mode].button,
+				title: modeTitle[this.content.mode].button,
 				widthWeight: 44,
 				align: "right",
 				id: "changeMode"
 			}
 		};
-		if (this.mode == 1) titleAndMode.style.txt2.color = [darkFont_Inactive, darkFont_Inactive];
+		if (modeName === "balance") titleAndMode.style.txt2.color = [darkFont_Inactive, darkFont_Inactive];
 		titleAndMode.event = {
 			changeMode: () => {
-				this.mode = (this.mode + 1) % 2;
+				this.content.mode = (this.content.mode + 1) % 2;
+				this.file.content = this.content;
 				this.refresh()
 			}
 		};
 		titleAndMode.ApplyStyles();
-		for (let i=0; i<this.content.length; i++) {
+		for (let i=0; i<this.content.balance.length; i++) {
 			let subtotal, showCount, unit;
 			if (REQUIRED[i].unit === "pieces") {
-				subtotal = this.content[i].piece * REQUIRED[i].type;
-				showCount = `${addComma(this.content[i].piece)}枚`;
+				subtotal = this.content.balance[i].piece * REQUIRED[i].type;
+				showCount = `${addComma(this.content.balance[i].piece)}枚`;
 				unit = "枚";
 			} else {
-				subtotal = this.content[i].piece * REQUIRED[i].type + this.content[i].stick * REQUIRED[i].type * 50; // can't use getSubtotal() since order doesn't match
-				showCount = `${addComma(this.content[i].stick)}本 + ${addComma(this.content[i].piece)}枚`;
+				subtotal = this.content.balance[i].piece * REQUIRED[i].type + this.content.balance[i].stick * REQUIRED[i].type * 50; // can't use getSubtotal() since order doesn't match
+				showCount = `${addComma(this.content.balance[i].stick)}本 + ${addComma(this.content.balance[i].piece)}枚`;
 				unit = "本";
 			}
 			const row = new Layout(this.table);
@@ -261,22 +279,22 @@ class Table {
 						widthWeight: 5
 					},
 					txt2: {
-						text: [`${addComma(this.content[i].type)}`, ""],
+						text: [`${addComma(this.content.balance[i].type)}`, ""],
 						font: [new Font("Arial-BoldMT", 22), new Font("Arial-BoldMT", 22)],
 						align: "right",
 						widthWeight: 22,
 					},
 					txt3: {
-						text: [`${addComma(REQUIRED[i].required)}${unit}`, ""],
+						text: [`${REQUIRED[i].type === 10000 ? "-- " : addComma(REQUIRED[i].required)}${unit}`, ""],
 						font: [new Font("Arial-MT", 22), new Font("Arial-MT", 22)],
-						color: [this.mode == 0 ? darkFont_Active : darkFont_Inactive, this.mode == 0 ? darkFont_Active : darkFont_Inactive],
+						color: [modeName === "deficit" ? darkFont_Active : darkFont_Inactive, modeName === "deficit" ? darkFont_Active : darkFont_Inactive],
 						align: "right",
 						widthWeight: 23,
 					},
 					txt4: {
 						text: [" ".repeat(10) + showCount, " ".repeat(20) + `= ¥${addComma(subtotal)}`],
-						font: [new Font("Arial-MT", 23), new Font("Arial-MT", (this.content[i].piece || this.content[i].stick) ? 18 : 0)],
-						color: [null, green],
+						font: [new Font("Arial-MT", 23), new Font("Arial-MT", (this.content.balance[i].piece || this.content.balance[i].stick) ? 18 : 0)],
+						color: [null, (modeName === "deficit" && REQUIRED[i].type === 10000) ? red : green],
 						align: "left",
 						widthWeight: 54,
 					}
@@ -285,21 +303,21 @@ class Table {
 					selectRow: async () => {
 						let alertStyle = {
 							type: "alert",
-							title: `Enter the ${modeTitle[this.mode].title} for ¥${this.content[i].type}`,
+							title: `Enter the ${modeName} for ¥${this.content.balance[i].type}`,
 							message: `The necessary ${REQUIRED[i].unit} is ${REQUIRED[i].required}${unit}.`,
 							act1: "OK",
 							can2: "Cancel"
 						};
 						if (REQUIRED[i].unit === "pieces") {
-							alertStyle.txt3 = ["枚数...", String(this.content[i].piece == 0 ? "" : this.content[i].piece), "number"];
+							alertStyle.txt3 = ["枚数...", String(this.content.balance[i].piece == 0 ? "" : this.content.balance[i].piece), "number"];
 						} else {
-							alertStyle.txt3 = ["本数...", String(this.content[i].stick == 0 ? "" : this.content[i].stick), "number"];
-							alertStyle.txt4 = ["枚数...", String(this.content[i].piece == 0 ? "" : this.content[i].piece), "number"];
+							alertStyle.txt3 = ["本数...", String(this.content.balance[i].stick == 0 ? "" : this.content.balance[i].stick), "number"];
+							alertStyle.txt4 = ["枚数...", String(this.content.balance[i].piece == 0 ? "" : this.content.balance[i].piece), "number"];
 						}
 						const input = await presentAlert(alertStyle);
 						if (input.index === -1) return; // Canceled
 						if (!input.text[0] && !input.text[1]) return; // Empty input
-						if (!checkCondition(i, modeTitle[this.mode].title, input.text)) {
+						if (!checkCondition(i, modeName, input.text)) {
 							const doubleCheck = await presentAlert({
 								type: "alert",
 								title: `It exceeds the necessary piece`,
@@ -310,10 +328,10 @@ class Table {
 							if (doubleCheck.index === -1) return; // Canceled
 						}
 						if (REQUIRED[i].unit === "pieces") {
-							this.content[i].piece = parseInt(input.text[0]);
+							this.content.balance[i].piece = parseInt(input.text[0]);
 						} else {
-							this.content[i].stick = parseInt(input.text[0] ? input.text[0] : 0) + parseInt(input.text[1] / 50); // avoid being NaN
-							this.content[i].piece = parseInt(input.text[1] % 50);
+							this.content.balance[i].stick = parseInt(input.text[0] ? input.text[0] : 0) + parseInt(input.text[1] / 50); // avoid being NaN
+							this.content.balance[i].piece = parseInt(input.text[1] % 50);
 						}
 						this.file.content = this.content;
 						this.refresh();
@@ -342,6 +360,7 @@ class Table {
 				});
 				if (confirm.index === -1) return;
 				this.content = jsonFormat;
+				this.content.lastReset = Date.now();
 				this.file.content = this.content;
 				this.refresh();
 			}
