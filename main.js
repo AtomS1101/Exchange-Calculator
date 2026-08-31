@@ -183,6 +183,11 @@ class Table {
 		const green = Color.dynamic(new Color("#34C759"), new Color("#4AFF3D"));
 		const red = Color.dynamic(new Color("#FF383C"), new Color("#FF4245"));
 		const backColor = Color.dynamic(new Color("#CCCCCC"), new Color("#333333"));
+		const formatter = new DateFormatter();
+		formatter.dateFormat = "E MMM d, H:mm";
+		const dateStr = this.content.lastReset
+			? `${formatter.string(new Date(this.content.lastReset))}`
+			: "Never";
 		let modeTitle = [
 			{ title: "balance", button: "💰残高■/💸不足□" },
 			{ title: "deficit", button: "💰残高□/💸不足■" }];
@@ -286,14 +291,14 @@ class Table {
 					},
 					txt3: {
 						text: [`${REQUIRED[i].type === 10000 ? "-- " : addComma(REQUIRED[i].required)}${unit}`, ""],
-						font: [new Font("Arial-MT", 22), new Font("Arial-MT", 22)],
+						font: [new Font("ArialMT", 17), new Font("ArialMT", 17)],
 						color: [modeName === "deficit" ? darkFont_Active : darkFont_Inactive, modeName === "deficit" ? darkFont_Active : darkFont_Inactive],
 						align: "right",
 						widthWeight: 23,
 					},
 					txt4: {
 						text: [" ".repeat(10) + showCount, " ".repeat(20) + `= ¥${addComma(subtotal)}`],
-						font: [new Font("Arial-MT", 23), new Font("Arial-MT", (this.content.balance[i].piece || this.content.balance[i].stick) ? 18 : 0)],
+						font: [new Font("ArialMT", 17), new Font("ArialMT", (this.content.balance[i].piece || this.content.balance[i].stick) ? 15 : 0)],
 						color: [null, (modeName === "deficit" && REQUIRED[i].type === 10000) ? red : green],
 						align: "left",
 						widthWeight: 54,
@@ -339,13 +344,26 @@ class Table {
 				};
 			row.ApplyStyles();
 		}
+
 		const resetBtnRow = new Layout(this.table);
 		resetBtnRow.style = {
 			body: { height: 100 },
-			btn1: {
-				title: " ".repeat(20) + "Reset Sheet",
+			txt1: {
+				text: ["Last Reset:", ""],
+				font: [new Font("Arial-BoldMT", 16), new Font("Arial-BoldMT", 14)],
+				align: "left",
+				widthWeight: 28,
+			},
+			txt2: {
+				text: [dateStr, ""],
+				font: [new Font("ArialMT", 14), new Font("ArialMT", 14)],
+				align: "left",
+				widthWeight: 43,
+			},
+			btn3: {
+				title: " ".repeat(5) + "Reset Sheet",
 				align: "right",
-				widthWeight: 100,
+				widthWeight: 30,
 				id: "reset"
 			}
 		};
