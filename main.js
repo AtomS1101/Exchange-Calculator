@@ -178,7 +178,7 @@ class Table {
 
 	refresh(file) {
 		this.table.removeAllRows();
-		const darkFont_Active = Color.dynamic(new Color("#7F7F7F"), new Color("#8E8E8E"));
+		const darkFont_Active = Color.dynamic(new Color("#7F7F7F"), new Color("#A0A0A0"));
 		const darkFont_Inactive = Color.dynamic(new Color("#DDDDDD"), new Color("#303030"));
 		const green = Color.dynamic(new Color("#34C759"), new Color("#4AFF3D"));
 		const red = Color.dynamic(new Color("#FF383C"), new Color("#FF4245"));
@@ -265,6 +265,7 @@ class Table {
 			} else {
 				subtotal = this.content.balance[i].piece * REQUIRED[i].type + this.content.balance[i].stick * REQUIRED[i].type * 50; // can't use getSubtotal() since order doesn't match
 				showCount = `${addComma(this.content.balance[i].stick)}本 + ${addComma(this.content.balance[i].piece)}枚`;
+				showCount += this.content.balance[i].stick > 0 ? ` = ${addComma(50 * this.content.balance[i].stick + this.content.balance[i].piece)}枚` : "";
 				unit = "本";
 			}
 			const row = new Layout(this.table);
@@ -294,10 +295,10 @@ class Table {
 						font: [new Font("ArialMT", 17), new Font("ArialMT", 17)],
 						color: [modeName === "deficit" ? darkFont_Active : darkFont_Inactive, modeName === "deficit" ? darkFont_Active : darkFont_Inactive],
 						align: "right",
-						widthWeight: 23,
+						widthWeight: 19,
 					},
 					txt4: {
-						text: [" ".repeat(10) + showCount, " ".repeat(20) + `= ¥${addComma(subtotal)}`],
+						text: [" ".repeat(8) + showCount, " ".repeat(20) + `= ¥${addComma(subtotal)}`],
 						font: [new Font("ArialMT", 17), new Font("ArialMT", (this.content.balance[i].piece || this.content.balance[i].stick) ? 15 : 0)],
 						color: [null, (modeName === "deficit" && REQUIRED[i].type === 10000) ? red : green],
 						align: "left",
